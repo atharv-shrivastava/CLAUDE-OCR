@@ -4,10 +4,11 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>PARAKH OCR - Food Label Extractor</title>
+  <link rel="stylesheet" href="style.css">
   <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
   <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
   <script src="https://cdn.tailwindcss.com"></script>
-  <script src="https://cdn.jsdelivr.net/npm/lucide@latest"></script>
 </head>
 <body>
   <div id="root"></div>
@@ -15,35 +16,30 @@
   <script type="text/babel">
     const { useState, useRef } = React;
 
-    // Lucide icons (simplified inline versions since CDN doesn't export React components easily)
     const Upload = () => (
       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10" />
       </svg>
     );
-
     const Camera = () => (
       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
       </svg>
     );
-
     const Loader = () => (
       <svg className="w-8 h-8 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
       </svg>
     );
-
     const AlertCircle = () => (
       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4v.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
       </svg>
     );
-
     const CheckCircle = () => (
       <svg className="w-5 h-5 text-green-600" fill="currentColor" viewBox="0 0 20 20">
-        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414-1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
       </svg>
     );
 
@@ -53,140 +49,71 @@
       const [error, setError] = useState(null);
       const [ocrText, setOcrText] = useState('');
       const [mode, setMode] = useState('upload');
-      const [apiUrl, setApiUrl] = useState(
-        localStorage.getItem('parakh_api_url') || 'http://localhost:5000'
-      );
+      const [apiUrl, setApiUrl] = useState(localStorage.getItem('parakh_api_url') || 'http://localhost:5000');
       const fileInputRef = useRef(null);
       const cameraRef = useRef(null);
       const canvasRef = useRef(null);
 
-      const saveApiUrl = (url) => {
-        setApiUrl(url);
-        localStorage.setItem('parakh_api_url', url);
-      };
+      const saveApiUrl = (url) => { setApiUrl(url); localStorage.setItem('parakh_api_url', url); };
 
       const extractFromImage = async (file) => {
-        setLoading(true);
-        setError(null);
-        setFields(null);
-        setOcrText('');
-
+        setLoading(true); setError(null); setFields(null); setOcrText('');
         try {
-          const formData = new FormData();
-          formData.append('file', file);
-
-          const response = await fetch(`${apiUrl}/extract`, {
-            method: 'POST',
-            body: formData,
-          });
-
+          const formData = new FormData(); formData.append('file', file);
+          const response = await fetch(`${apiUrl.replace(/\/$/, '')}/extract`, { method: 'POST', body: formData });
           const data = await response.json();
-
-          if (!data.success) {
-            throw new Error(data.error || 'Failed to extract fields');
-          }
-
-          setOcrText(data.ocr_text);
-          setFields(data.fields);
-        } catch (err) {
-          setError(err.message);
-        } finally {
-          setLoading(false);
-        }
+          if (!response.ok || !data.success) throw new Error(data.error || 'Failed to extract fields');
+          setOcrText(data.ocr_text || ''); setFields(data.fields || {});
+        } catch (err) { setError(err.message); }
+        finally { setLoading(false); }
       };
 
-      const handleFileUpload = (e) => {
-        const file = e.target.files?.[0];
-        if (file) {
-          extractFromImage(file);
-        }
-      };
+      const handleFileUpload = (e) => { const file = e.target.files?.[0]; if (file) extractFromImage(file); };
 
       const startCamera = async () => {
+        setMode('camera'); setError(null);
         try {
-          const stream = await navigator.mediaDevices.getUserMedia({
-            video: { facingMode: 'environment' },
-          });
-          if (cameraRef.current) {
-            cameraRef.current.srcObject = stream;
-          }
-        } catch (err) {
-          setError('Could not access camera: ' + err.message);
-        }
+          const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+          if (cameraRef.current) cameraRef.current.srcObject = stream;
+        } catch (err) { setError('Could not access camera: ' + err.message); }
       };
 
       const capturePhoto = () => {
         if (cameraRef.current && canvasRef.current) {
-          const ctx = canvasRef.current.getContext('2d');
-          ctx.drawImage(cameraRef.current, 0, 0);
-          canvasRef.current.toBlob((blob) => {
-            if (blob) {
-              const file = new File([blob], 'camera_capture.jpg', { type: 'image/jpeg' });
-              extractFromImage(file);
-              if (cameraRef.current?.srcObject) {
-                cameraRef.current.srcObject.getTracks().forEach((t) => t.stop());
-              }
-              setMode('upload');
-            }
-          });
+          const canvas = canvasRef.current;
+          canvas.width = cameraRef.current.videoWidth || 640;
+          canvas.height = cameraRef.current.videoHeight || 480;
+          canvas.getContext('2d').drawImage(cameraRef.current, 0, 0, canvas.width, canvas.height);
+          canvas.toBlob((blob) => {
+            if (blob) extractFromImage(new File([blob], 'camera_capture.jpg', { type: 'image/jpeg' }));
+            stopCamera();
+          }, 'image/jpeg', 0.92);
         }
       };
 
       const stopCamera = () => {
-        if (cameraRef.current?.srcObject) {
-          cameraRef.current.srcObject.getTracks().forEach((t) => t.stop());
-        }
+        if (cameraRef.current?.srcObject) cameraRef.current.srcObject.getTracks().forEach((t) => t.stop());
+        if (cameraRef.current) cameraRef.current.srcObject = null;
         setMode('upload');
       };
 
       const FieldDisplay = ({ name, data }) => {
         if (data.value === null) return null;
-
         return (
-          <div className="bg-white border-l-4 border-green-500 p-4 rounded shadow-sm">
+          <div className="field-card bg-white border-l-4 border-green-500 p-4 rounded shadow-sm">
             <div className="flex items-start justify-between gap-3">
               <div className="flex-1">
-                <h4 className="font-semibold text-gray-900 capitalize">
-                  {name.replace(/_/g, ' ')}
-                </h4>
+                <h4 className="font-semibold text-gray-900 capitalize">{name.replace(/_/g, ' ')}</h4>
                 <p className="text-lg font-bold text-green-600 mt-1">{data.value}</p>
-                {data.raw && (
-                  <p className="text-xs text-gray-600 mt-1 italic">Raw: {data.raw}</p>
-                )}
-                {data.confidence && (
+                {data.raw && <p className="text-xs text-gray-600 mt-1 italic">Raw: {data.raw}</p>}
+                {data.confidence != null && (
                   <div className="mt-2 flex items-center gap-2">
-                    <div className="bg-gray-200 rounded-full h-2 w-24">
-                      <div
-                        className={`h-2 rounded-full ${
-                          data.confidence >= 0.8
-                            ? 'bg-green-500'
-                            : data.confidence >= 0.6
-                              ? 'bg-yellow-500'
-                              : 'bg-red-500'
-                        }`}
-                        style={{ width: `${data.confidence * 100}%` }}
-                      />
-                    </div>
-                    <span className="text-xs font-mono text-gray-600">
-                      {(data.confidence * 100).toFixed(0)}%
-                    </span>
+                    <div className="bg-gray-200 rounded-full h-2 w-24"><div className={`h-2 rounded-full ${data.confidence >= 0.8 ? 'bg-green-500' : data.confidence >= 0.6 ? 'bg-yellow-500' : 'bg-red-500'}`} style={{ width: `${data.confidence * 100}%` }} /></div>
+                    <span className="text-xs font-mono text-gray-600">{(data.confidence * 100).toFixed(0)}%</span>
                   </div>
                 )}
-                {data.evidence && (
-                  <p className="text-xs text-gray-500 mt-2 leading-relaxed">
-                    {data.evidence}
-                  </p>
-                )}
-                {data.meaning && (
-                  <details className="mt-3">
-                    <summary className="text-sm text-blue-600 cursor-pointer font-medium hover:underline">
-                      What does this mean?
-                    </summary>
-                    <p className="text-sm text-gray-700 mt-2 leading-relaxed">
-                      {data.meaning}
-                    </p>
-                  </details>
-                )}
+                {data.evidence && <p className="text-xs text-gray-500 mt-2 leading-relaxed">{data.evidence}</p>}
+                {data.meaning && <details className="mt-3"><summary className="text-sm text-blue-600 cursor-pointer font-medium hover:underline">What does this mean?</summary><p className="text-sm text-gray-700 mt-2 leading-relaxed">{data.meaning}</p></details>}
               </div>
               <CheckCircle />
             </div>
@@ -197,188 +124,51 @@
       return (
         <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
           <div className="max-w-4xl mx-auto">
-            <div className="text-center mb-8">
+            <header className="text-center mb-8 hero">
+              <div className="brand-badge">P</div>
               <h1 className="text-4xl font-bold text-gray-900 mb-2">PARAKH OCR</h1>
-              <p className="text-gray-600">
-                Extract packaging information from Indian food labels instantly
-              </p>
+              <p className="text-gray-600">Extract packaging information from Indian food labels instantly</p>
+            </header>
+
+            <div className="bg-white rounded-lg shadow-md p-4 mb-6 panel">
+              <label className="block text-sm font-medium text-gray-700 mb-2">Backend API URL</label>
+              <input type="text" value={apiUrl} onChange={(e) => saveApiUrl(e.target.value)} placeholder="http://localhost:5000" className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent" />
+              <p className="text-xs text-gray-500 mt-1">Default: http://localhost:5000</p>
             </div>
 
-            <div className="bg-white rounded-lg shadow-md p-4 mb-6">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Backend API URL
-              </label>
-              <input
-                type="text"
-                value={apiUrl}
-                onChange={(e) => saveApiUrl(e.target.value)}
-                placeholder="http://localhost:5000"
-                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-              />
-              <p className="text-xs text-gray-500 mt-1">
-                Default: http://localhost:5000 (change if your backend is elsewhere)
-              </p>
+            <div className="bg-white rounded-lg shadow-md p-6 mb-6 panel">
+              <div className="flex gap-4 mb-6 tabs">
+                <button onClick={() => { stopCamera(); setMode('upload'); }} className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition ${mode === 'upload' ? 'bg-indigo-600 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`}><Upload /> Upload Image</button>
+                <button onClick={startCamera} className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition ${mode === 'camera' ? 'bg-indigo-600 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`}><Camera /> Camera</button>
+              </div>
+
+              {mode === 'upload' && <div onClick={() => fileInputRef.current?.click()} className="dropzone border-2 border-dashed border-indigo-300 rounded-lg p-12 text-center cursor-pointer hover:bg-indigo-50 transition">
+                <div className="upload-icon mb-3 flex justify-center"><Upload /></div>
+                <p className="text-gray-900 font-medium mb-1">Click to upload or drag and drop</p>
+                <p className="text-sm text-gray-500">PNG, JPG, JPEG, GIF, WEBP (Max 16MB)</p>
+                <input ref={fileInputRef} type="file" accept="image/*" onChange={handleFileUpload} className="hidden" />
+              </div>}
+
+              {mode === 'camera' && <div className="space-y-4 camera-panel">
+                <video ref={cameraRef} autoPlay playsInline className="w-full rounded-lg bg-black" />
+                <canvas ref={canvasRef} className="hidden" />
+                <div className="flex gap-3"><button onClick={capturePhoto} className="flex-1 bg-green-600 hover:bg-green-700 text-white font-medium py-2 px-4 rounded-lg transition flex items-center justify-center gap-2"><Camera /> Capture Photo</button><button onClick={stopCamera} className="flex-1 bg-gray-600 hover:bg-gray-700 text-white font-medium py-2 px-4 rounded-lg transition">Cancel</button></div>
+              </div>}
             </div>
 
-            <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-              <div className="flex gap-4 mb-6">
-                <button
-                  onClick={() => {
-                    setMode('upload');
-                    stopCamera();
-                  }}
-                  className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition ${
-                    mode === 'upload'
-                      ? 'bg-indigo-600 text-white'
-                      : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                  }`}
-                >
-                  <Upload />
-                  Upload Image
-                </button>
-                <button
-                  onClick={() => {
-                    setMode('camera');
-                    startCamera();
-                  }}
-                  className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition ${
-                    mode === 'camera'
-                      ? 'bg-indigo-600 text-white'
-                      : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                  }`}
-                >
-                  <Camera />
-                  Camera
-                </button>
-              </div>
+            {loading && <div className="bg-white rounded-lg shadow-md p-8 text-center panel"><div className="flex justify-center mb-3"><Loader /></div><p className="text-gray-700 font-medium">Processing image...</p><p className="text-sm text-gray-500 mt-1">Extracting text and parsing fields</p></div>}
+            {error && <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6 flex gap-3 error-box"><div><AlertCircle /></div><div><p className="font-medium text-red-900">Error</p><p className="text-sm text-red-800 mt-1">{error}</p></div></div>}
 
-              {mode === 'upload' && (
-                <div
-                  onClick={() => fileInputRef.current?.click()}
-                  className="border-2 border-dashed border-indigo-300 rounded-lg p-12 text-center cursor-pointer hover:bg-indigo-50 transition"
-                >
-                  <div className="mb-3 flex justify-center">
-                    <Upload />
-                  </div>
-                  <p className="text-gray-900 font-medium mb-1">
-                    Click to upload or drag and drop
-                  </p>
-                  <p className="text-sm text-gray-500">
-                    PNG, JPG, JPEG, GIF, WEBP (Max 16MB)
-                  </p>
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    accept="image/*"
-                    onChange={handleFileUpload}
-                    className="hidden"
-                  />
-                </div>
-              )}
+            {ocrText && <div className="bg-white rounded-lg shadow-md p-4 mb-6 panel"><details><summary className="text-sm font-medium text-gray-700 cursor-pointer hover:text-indigo-600">View Raw OCR Text</summary><pre className="mt-3 bg-gray-100 p-3 rounded text-xs overflow-auto max-h-40 text-gray-700">{ocrText}</pre></details></div>}
 
-              {mode === 'camera' && (
-                <div className="space-y-4">
-                  <video
-                    ref={cameraRef}
-                    autoPlay
-                    playsInline
-                    className="w-full rounded-lg bg-black"
-                  />
-                  <canvas
-                    ref={canvasRef}
-                    className="hidden"
-                    width={640}
-                    height={480}
-                  />
-                  <div className="flex gap-3">
-                    <button
-                      onClick={capturePhoto}
-                      className="flex-1 bg-green-600 hover:bg-green-700 text-white font-medium py-2 px-4 rounded-lg transition flex items-center justify-center gap-2"
-                    >
-                      <Camera />
-                      Capture Photo
-                    </button>
-                    <button
-                      onClick={stopCamera}
-                      className="flex-1 bg-gray-600 hover:bg-gray-700 text-white font-medium py-2 px-4 rounded-lg transition"
-                    >
-                      Cancel
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
+            {fields && <div className="space-y-4 results"><h2 className="text-2xl font-bold text-gray-900">Extracted Fields</h2><div className="grid gap-4 md:grid-cols-2">{Object.entries(fields).map(([name, data]) => <FieldDisplay key={name} name={name} data={data} />)}</div>{Object.values(fields).every((d) => d.value === null) && <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 text-center"><AlertCircle /><p className="text-yellow-800 text-sm">No fields could be extracted. Check the image quality and make sure it shows a food label.</p></div>}</div>}
 
-            {loading && (
-              <div className="bg-white rounded-lg shadow-md p-8 text-center">
-                <div className="flex justify-center mb-3">
-                  <Loader />
-                </div>
-                <p className="text-gray-700 font-medium">Processing image...</p>
-                <p className="text-sm text-gray-500 mt-1">
-                  Extracting text and parsing fields
-                </p>
-              </div>
-            )}
-
-            {error && (
-              <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6 flex gap-3">
-                <div className="flex-shrink-0 mt-0.5">
-                  <AlertCircle />
-                </div>
-                <div>
-                  <p className="font-medium text-red-900">Error</p>
-                  <p className="text-sm text-red-800 mt-1">{error}</p>
-                </div>
-              </div>
-            )}
-
-            {ocrText && (
-              <div className="bg-white rounded-lg shadow-md p-4 mb-6">
-                <details>
-                  <summary className="text-sm font-medium text-gray-700 cursor-pointer hover:text-indigo-600">
-                    View Raw OCR Text
-                  </summary>
-                  <pre className="mt-3 bg-gray-100 p-3 rounded text-xs overflow-auto max-h-40 text-gray-700">
-                    {ocrText}
-                  </pre>
-                </details>
-              </div>
-            )}
-
-            {fields && (
-              <div className="space-y-4">
-                <h2 className="text-2xl font-bold text-gray-900">Extracted Fields</h2>
-                <div className="grid gap-4 md:grid-cols-2">
-                  {Object.entries(fields).map(([name, data]) => (
-                    <FieldDisplay key={name} name={name} data={data} />
-                  ))}
-                </div>
-                {Object.values(fields).every((d) => d.value === null) && (
-                  <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 text-center">
-                    <div className="flex justify-center mb-2">
-                      <AlertCircle />
-                    </div>
-                    <p className="text-yellow-800 text-sm">
-                      No fields could be extracted. Check the image quality and make sure it shows a food label.
-                    </p>
-                  </div>
-                )}
-              </div>
-            )}
-
-            <div className="mt-12 text-center text-sm text-gray-600">
-              <p>PARAKH OCR Module • Powered by PaddleOCR</p>
-              <p className="mt-1 text-xs text-gray-500">
-                Processing happens locally on your backend server
-              </p>
-            </div>
+            <footer className="mt-12 text-center text-sm text-gray-600"><p>PARAKH OCR Module • Powered by PaddleOCR</p><p className="mt-1 text-xs text-gray-500">Processing happens locally on your backend server</p></footer>
           </div>
         </div>
       );
     }
-
-    ReactDOM.render(<ParakhOCRApp />, document.getElementById('root'));
+    ReactDOM.createRoot(document.getElementById('root')).render(<ParakhOCRApp />);
   </script>
 </body>
 </html>
