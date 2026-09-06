@@ -2,22 +2,18 @@
 ocr_engine.py
 Local OCR layer for PARAKH package-info extraction.
 
-Uses PaddleOCR (runs entirely on-device, no external API calls, no
-network dependency at inference time beyond the one-time model download).
-
-Output: list of OCRToken(text, confidence, bbox) — the raw evidence
-that the field-extraction layer (field_extractor.py) will parse.
+Uses PaddleOCR 3.x predict() API and converts its output into the
+OCRToken format used by the field-extraction layer.
 """
 
 from dataclasses import dataclass, field
 from typing import List, Tuple
-import numpy as np
 
 try:
     from paddleocr import PaddleOCR
 except ImportError as e:
     raise ImportError(
-        "PaddleOCR not installed. Run: pip install paddleocr paddlepaddle --break-system-packages"
+        "PaddleOCR not installed. Run: pip install paddleocr paddlepaddle"
     ) from e
 
 
@@ -25,33 +21,34 @@ except ImportError as e:
 class OCRToken:
     text: str
     confidence: float
-    bbox: List[Tuple[float, float]]  # 4 corner points, clockwise from top-left
+    bbox: List[Tuple[float, float]]
 
     @property
     def center_y(self) -> float:
-        return sum(p[1] for p in self.bbox) / 4
+        if not self.bbox:
+            return 0.0
+        return sum(p[1] for p in self.bbox) / len(self.bbox)
 
     @property
     def center_x(self) -> float:
-        return sum(p[0] for p in self.bbox) / 4
+        if not self.bbox:
+            return 0.0
+        return sum(p[0] for p in self.bbox) / len(self.bbox)
 
 
 @dataclass
 class OCRResult:
     tokens: List[OCRToken] = field(default_factory=list)
-    full_text: str = ""  # tokens joined in reading order, for regex passes
+    full_text: str = ""
 
     def sorted_reading_order(self) -> List[OCRToken]:
-        """Rough top-to-bottom, left-to-right ordering.
-        Groups tokens into text lines by y-proximity, then sorts each
-        line left-to-right. Packaging labels are rarely single-column
-        so this is an approximation, not a layout parser.
-        """
         if not self.tokens:
             return []
+
         toks = sorted(self.tokens, key=lambda t: t.center_y)
         lines: List[List[OCRToken]] = []
-        line_thresh = 15  # px tolerance for "same line"
+        line_thresh = 15
+
         for tok in toks:
             placed = False
             for line in lines:
@@ -61,6 +58,7 @@ class OCRResult:
                     break
             if not placed:
                 lines.append([tok])
+
         ordered: List[OCRToken] = []
         for line in lines:
             ordered.extend(sorted(line, key=lambda t: t.center_x))
@@ -68,51 +66,121 @@ class OCRResult:
 
 
 class OCREngine:
-    """
-    Thin wrapper around PaddleOCR. Loads once, reused across images.
-    lang='en' works for English + digits; Indian packs often mix in
-    Hindi/regional script — for those, swap lang or run a second pass
-    with lang='hi' and merge results (see README for why we don't
-    auto-detect language: it doubles inference time on every image and
-    most compliance-relevant fields — MRP, FSSAI no, dates — are in
-    English/numerals regardless of the rest of the label).
-    """
+    """Thin wrapper around PaddleOCR's current predict() API."""
 
     def __init__(self, lang: str = "en", use_gpu: bool = False):
-        self._ocr = PaddleOCR(
-            use_angle_cls=True,   # handles rotated/skewed pack photos
-            lang=lang,
-            show_log=False,
-        )
+        # PaddleOCR 3.x uses the unified predict() interface.
+        # Do not pass the old show_log or cls arguments.
+        self._ocr = PaddleOCR(lang=lang)
+
+    @staticmethod
+    def _to_list(value):
+        """Convert numpy arrays / Paddle tensors / tuples to Python lists."""
+        if value is None:
+            return None
+        if hasattr(value, "tolist"):
+            return value.tolist()
+        return value
+
+    @staticmethod
+    def _extract_result_dict(res):
+        """Get the result dictionary from PaddleOCR 3.x OCRResult."""
+        data = res
+
+        # PaddleOCR 3.x OCRResult exposes JSON through .json.
+        if hasattr(res, "json"):
+            data = res.json
+            if callable(data):
+                data = data()
+
+        if isinstance(data, str):
+            import json
+            data = json.loads(data)
+
+        if isinstance(data, dict) and "res" in data:
+            data = data["res"]
+
+        return data if isinstance(data, dict) else {}
 
     def extract(self, image_path: str) -> OCRResult:
-        raw = self._ocr.ocr(image_path, cls=True)
         result = OCRResult()
-        if not raw or raw[0] is None:
+
+        # PaddleOCR 3.x: predict() replaces the old ocr(..., cls=True) API.
+        raw = self._ocr.predict(image_path)
+
+        if raw is None:
             return result
 
-        lines_text = []
-        for line in raw[0]:
-            bbox, (text, conf) = line
-            result.tokens.append(OCRToken(text=text, confidence=float(conf), bbox=bbox))
-            lines_text.append(text)
+        for res in raw:
+            data = self._extract_result_dict(res)
+
+            texts = self._to_list(data.get("rec_texts")) or []
+            scores = self._to_list(data.get("rec_scores")) or []
+            boxes = self._to_list(data.get("rec_polys"))
+            if boxes is None:
+                boxes = self._to_list(data.get("dt_polys"))
+            if boxes is None:
+                boxes = self._to_list(data.get("rec_boxes")) or []
+
+            for i, text in enumerate(texts):
+                text = str(text).strip()
+                if not text:
+                    continue
+
+                confidence = float(scores[i]) if i < len(scores) else 0.0
+                bbox = boxes[i] if i < len(boxes) else []
+                bbox = self._to_list(bbox) or []
+
+                # rec_boxes can be [x1, y1, x2, y2]. Convert to 4 corners.
+                if (
+                    len(bbox) == 4
+                    and bbox
+                    and isinstance(bbox[0], (int, float))
+                ):
+                    x1, y1, x2, y2 = bbox
+                    bbox = [
+                        (float(x1), float(y1)),
+                        (float(x2), float(y1)),
+                        (float(x2), float(y2)),
+                        (float(x1), float(y2)),
+                    ]
+                else:
+                    bbox = [
+                        (float(point[0]), float(point[1]))
+                        for point in bbox
+                        if isinstance(point, (list, tuple)) and len(point) >= 2
+                    ]
+
+                if len(bbox) < 4:
+                    continue
+
+                result.tokens.append(
+                    OCRToken(
+                        text=text,
+                        confidence=confidence,
+                        bbox=bbox[:4],
+                    )
+                )
 
         result.full_text = "\n".join(
-            t.text for t in result.sorted_reading_order()
+            token.text for token in result.sorted_reading_order()
         )
         return result
 
 
 if __name__ == "__main__":
     import sys
+
     if len(sys.argv) != 2:
         print("Usage: python ocr_engine.py <image_path>")
         sys.exit(1)
 
     engine = OCREngine()
     res = engine.extract(sys.argv[1])
+
     print("--- Raw tokens ---")
-    for t in res.tokens:
-        print(f"[{t.confidence:.2f}] {t.text}")
+    for token in res.tokens:
+        print(f"[{token.confidence:.2f}] {token.text}")
+
     print("\n--- Reading order text ---")
     print(res.full_text)
