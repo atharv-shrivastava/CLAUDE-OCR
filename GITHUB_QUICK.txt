@@ -1,0 +1,76 @@
+================================================================================
+        GITHUB UPLOAD IN 5 COMMANDS (Copy-Paste Only)
+================================================================================
+
+NO READING. Just execute these 5 commands in order in your terminal.
+Replace YOUR-USERNAME, YOUR-REPO-NAME, and YOUR-TOKEN as instructed.
+
+================================================================================
+COMMAND 1: Go to GitHub and Create a New Repo
+──────────────────────────────────────────────
+1. Open: https://github.com/new
+2. Name: parakh-ocr-ui
+3. Add README.md ✓, Add .gitignore (Python) ✓
+4. Create Repository
+5. Copy the HTTPS URL from the page (looks like https://github.com/YOUR-USERNAME/parakh-ocr-ui.git)
+
+================================================================================
+COMMAND 2: Get GitHub Token
+────────────────────────────
+1. Go to: https://github.com/settings/tokens/new
+2. Click: "Generate new token (classic)"
+3. Name it: parakh-upload
+4. Check: ✓ repo, ✓ workflow
+5. Generate
+6. Copy the token immediately (you'll never see it again)
+
+================================================================================
+COMMAND 3: Navigate to Your Project
+────────────────────────────────────
+In terminal, go to your parakh-ocr-ui folder:
+
+$ cd /path/to/parakh-ocr-ui
+
+(The one with app.py, index.html, requirements.txt, etc.)
+
+
+================================================================================
+COMMAND 4: Git Init and Commit
+───────────────────────────────
+$ git init
+$ git add .
+$ git commit -m "Initial commit: PARAKH OCR UI"
+
+
+================================================================================
+COMMAND 5: Push to GitHub
+──────────────────────────
+Replace YOUR-USERNAME and YOUR-REPO-NAME:
+
+$ git remote add origin https://github.com/YOUR-USERNAME/YOUR-REPO-NAME.git
+$ git branch -M main
+$ git push -u origin main
+
+When it asks for password, paste your token (from Command 2).
+
+
+================================================================================
+DONE!
+─────
+Your code is now on GitHub.
+Visit: https://github.com/YOUR-USERNAME/YOUR-REPO-NAME
+
+See it? Great. Now see GITHUB_UPLOAD.md if you need to make changes later.
+
+
+================================================================================
+CHEAT SHEET: Future Updates
+───────────────────────────
+
+After you edit files locally:
+
+$ git add .
+$ git commit -m "describe what you changed"
+$ git push
+
+That's it.

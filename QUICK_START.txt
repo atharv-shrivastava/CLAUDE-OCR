@@ -1,0 +1,147 @@
+================================================================================
+                    PARAKH OCR UI - QUICK START (2 MINUTES)
+================================================================================
+
+STEP 1: Install Dependencies
+─────────────────────────────
+$ cd parakh-ocr-ui
+$ pip install -r requirements.txt --break-system-packages
+
+(This downloads PaddleOCR models on first run, ~5-10 minutes depending on internet)
+
+
+STEP 2: Start Backend
+──────────────────────
+$ python app.py
+
+You'll see:
+  Initializing OCR engine...
+  OCR engine ready
+   * Running on http://0.0.0.0:5000
+
+Leave this terminal running.
+
+
+STEP 3: Open Frontend
+─────────────────────
+In your browser (Chrome, Firefox, Safari, Edge), open:
+
+  • LOCAL FILE: file:///full/path/to/parakh-ocr-ui/index.html
+  
+  OR
+  
+  • VIA HTTP: Open another terminal:
+    $ python -m http.server 8000 --directory /path/to/parakh-ocr-ui
+    Then go to: http://localhost:8000
+
+
+STEP 4: Use It
+──────────────
+You should see a clean UI with:
+
+  [Upload Image] [Camera] buttons
+  
+Pick one:
+  • Upload: Click to select a food pack photo from your phone/computer
+  • Camera: Tap to snap a live photo using your device's camera
+
+The app will:
+  1. Send image to backend
+  2. OCR extracts text (~2-5 seconds)
+  3. Parse fields (FSSAI, MRP, batch no, mfg date, etc.)
+  4. Display results with confidence scores
+
+
+EXPECTED OUTPUT
+───────────────
+Green boxes showing:
+
+  FSSAI NUMBER: 10015064000892
+  (confidence: 95%, evidence: matched 'FSSAI' keyword + 14-digit number)
+  
+  MRP: 20
+  (confidence: 90%)
+  
+  NET QUANTITY: 52 g
+  (confidence: 90%)
+  
+  ... and more fields ...
+
+Each field shows:
+  ✓ Value (what was found)
+  ✓ Raw (exact OCR text)
+  ✓ Confidence (0-100%)
+  ✓ Evidence (why we picked it)
+  ✓ Meaning (plain-English explanation, clickable)
+
+
+TROUBLESHOOTING
+────────────────
+❌ "Connection refused"
+   → Backend not running. Check step 2 above.
+
+❌ "No fields extracted"
+   → Image quality issue. Try:
+     - Better lighting
+     - Less glare/shadow on label
+     - Make sure full label is visible
+     - Try a different pack
+
+❌ "Camera not working"
+   → Browser permissions issue.
+     Check top-left of browser address bar for permission prompt.
+     Allow camera access.
+
+❌ Backend crashes
+   → Check RAM. PaddleOCR needs ~300-500MB free.
+     Close other apps and retry.
+
+
+DEPLOYMENT
+──────────
+For production / other machines:
+
+1. Edit index.html or use UI to set "Backend API URL"
+   Default: http://localhost:5000
+   Change to: http://<your-server-ip>:5000
+
+2. Or use Docker:
+   $ docker build -t parakh-ocr .
+   $ docker run -p 5000:5000 parakh-ocr
+
+3. Then access from mobile on same WiFi:
+   http://<backend-machine-ip>:5000
+
+
+FILES INCLUDED
+───────────────
+index.html          ← Open this in your browser (entire frontend)
+app.py              ← Run this (Flask backend)
+requirements.txt    ← Python dependencies
+extraction_lib/     ← OCR + field extraction code
+  ├── ocr_engine.py
+  ├── field_extractor.py
+  └── pipeline.py
+
+SETUP.md            ← Full technical setup guide
+QUICK_START.txt     ← This file
+
+
+WHAT'S HAPPENING UNDER THE HOOD
+─────────────────────────────────
+[Your Phone/Computer]
+        ↓
+    [Browser with React UI]
+        ↓ (POST /extract with image file)
+    [Flask Backend (app.py)]
+        ↓
+    [PaddleOCR - extracts text from image]
+        ↓
+    [Field Extractor - parses 11 structured fields using regex]
+        ↓ (JSON response with fields + confidence scores)
+    [Browser displays results]
+
+
+THAT'S IT!
+──────────
+Questions? Check SETUP.md for detailed deployment options and troubleshooting.
