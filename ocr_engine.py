@@ -71,7 +71,16 @@ class OCREngine:
     def __init__(self, lang: str = "en", use_gpu: bool = False):
         # PaddleOCR 3.x uses the unified predict() interface.
         # Do not pass the old show_log or cls arguments.
-        self._ocr = PaddleOCR(lang=lang)
+        #
+        # PaddlePaddle 3.3.x + PaddleOCR 3.7.x can crash on Windows/CPU
+        # inside the oneDNN/PIR path with:
+        # ConvertPirAttribute2RuntimeAttribute not support
+        # [pir::ArrayAttribute<pir::DoubleAttribute>]
+        # Disable oneDNN so CPU inference uses the standard Paddle kernels.
+        self._ocr = PaddleOCR(
+            lang=lang,
+            enable_mkldnn=False,
+        )
 
     @staticmethod
     def _to_list(value):
@@ -87,7 +96,6 @@ class OCREngine:
         """Get the result dictionary from PaddleOCR 3.x OCRResult."""
         data = res
 
-        # PaddleOCR 3.x OCRResult exposes JSON through .json.
         if hasattr(res, "json"):
             data = res.json
             if callable(data):
@@ -131,7 +139,6 @@ class OCREngine:
                 bbox = boxes[i] if i < len(boxes) else []
                 bbox = self._to_list(bbox) or []
 
-                # rec_boxes can be [x1, y1, x2, y2]. Convert to 4 corners.
                 if (
                     len(bbox) == 4
                     and bbox
